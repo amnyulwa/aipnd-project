@@ -16,7 +16,7 @@ with Image.open(image) as im:
     print('flowers/train/1/image_06734.jpg',im)
 
     im.thumbnail(size)
-    im.show()
+    
     width, height = im.size
 
     left = (width - 224) / 2
@@ -25,13 +25,16 @@ with Image.open(image) as im:
     bottom = (height + 224) / 2
 
     cropped_im = im.crop((left, top, right, bottom))
+    cropped_im.show()
     np_image = np.array(cropped_im)
-
+    print(np_image.shape)
         #we are looping through this image 3 times because there is 3 color chanel
-    np_image = (np_image - mean) / std
+    for i in range(3):
+        np_image[:, :, i] = (np_image[:, :, i] - mean[i]) / std[i]
 
         #we are converting this back to torch tensor because the model is expecting a torch tensor
     np_image = torch.from_numpy(np_image.transpose(2, 0, 1))
+    print(np_image.shape)
 
 
 
