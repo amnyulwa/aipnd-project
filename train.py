@@ -1,3 +1,7 @@
+
+# PROGRAMMER: Anesu S Mnyulwa 
+# DATE CREATED:                                 
+# REVISED DATE: 8/24/2025
 # TODO  0:
 #Train a new network on a data set with train.py
 
@@ -23,17 +27,29 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torchvision import datasets, transforms, models, utils
 
+
+
+
+#so far this method only accepts 3 types of models and if there is a need i can work on expanding the list or automate the process to show more models
+resnet18 = models.resnet18(pretrained=True)
+alexnet = models.alexnet(pretrained=True)
+vgg16 = models.vgg16(pretrained=True)
+
+models = {'resnet': resnet18, 'alexnet': alexnet, 'vgg': vgg16}
+
+
+
 def get_input_args():
   
    
     parser = argparse.ArgumentParser(description='Program accepts Directory path as argument otherwise current folder is set as default')
 
-    # TODO 2: Doing a default argument of os.getcwd() might not work because you need to define a default folder name which can be different
+    # TODO 0: Doing a default argument of os.getcwd() might not work because you need to define a default folder name which can be different
     # or we can just assume that the directoy retrieved in os.getcwd has the train and test folders as well as the cat_to_name.json file
     #parser.add_argument('--dir', nargs = '?', default = os.getcwd() , help='Image Folder as --dir with default value "pet_images"')
     parser.add_argument('dir', nargs = '?', default = os.getcwd()+'/', help='Image Dataset Folder otherwise default is current working directory')        
     parser.add_argument('--save_dir', default=os.getcwd())
-    parser.add_argument('--arch', default= "vgg16")
+    parser.add_argument('--arch', default= "vgg")
     parser.add_argument('--learning_rate', type=float, default= 0.02)
     parser.add_argument('--hidden_units', type=int, default=512)
     parser.add_argument('--epochs', type=int, default=10)
@@ -89,7 +105,11 @@ def load_transform():
     print(len(trainloader))
 """
 
+
 def main():
+    #Please make sure to change this to CPU when you complete this project
+    device = "cuda:0"
+    device = "mps"
     
     start_time = time()    
     
@@ -101,7 +121,7 @@ def main():
       
     print("Current Directory:{}, LR:{}, Epoch:{}".format(in_arg.dir, in_arg.learning_rate, in_arg.epochs))
 
-    #setup data directories 
+    # setup data directories 
     # we may need to improve this such that the directory containing the data has a consistent name
     # We can update the folder name to be just data?
     data_dir = in_arg.dir     
@@ -109,13 +129,64 @@ def main():
     valid_dir = data_dir + 'flowers' + '/valid'
     test_dir = data_dir + 'flowers' + '/test'
     
+    #TODO 2: select model architecture 
+    model = models[in_arg.arch] #accepts input from user for model architecture     
+    print("model Arch:", model)
+
+    for param in model.parameters():
+        param.requires_grad = False 
+
+    class Classifier(nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            # part-2 Neural Networks,  fully-connected or dense networks. Each unit in one layer is connected to each unit in the next layer. In fully-connected networks, the input to each layer must be a one-dimensional vector (which can be stacked into a 2D tensor as a batch of multiple examples)
+            self.fc1 = nn.Linear(25088, 4096)
+            self.fc2 = nn.Linear(4096, 2048)
+            self.fc3 = nn.Linear(2048, 1000)
+            self.fc4 = nn.Linear(1000, 102)
+            self.dropout = nn.Dropout(0.2)
+
+        def forward(self, x):
+            #print('Shape before {x.shape}')
+            x = x.view(x.shape[0], -1)
+
+            x = self.dropout(F.relu(self.fc1(x)))
+            x = self.dropout(F.relu(self.fc2(x)))
+            x = self.dropout(F.relu(self.fc3(x)))
+
+            x = F.log_softmax(self.fc4(x), dim=1)
+
+            return x
+
+    model.classifier = Classifier()
+
+    #TODO 3: define learning rate 
+    learning_rate = in_arg.learning_rate
+
+    #TODO 4: Actual labels
+    # Retrieve pet labels from the current working directory currently no arguments are setup        
+    cat_to_name = get_label_mapping(in_arg.dir)
+    print(cat_to_name)
+
+    #TODO 5: Model training Epoch argument
+    #It might be pointless to encapsulate in if arg since there is already a default argument defined
+    epochs = in_arg.epochs
+    print("Epochs:", in_arg.epochs)  
+
+    print("Hidden Units: {}", in_arg.hidden_units)  
+    if in_arg.gpu is True:
+        device = torch.device("cuda:0")
+        print("Device", device)
+   
+
     """
     Load Transforms
     """
     train_transforms = transforms.Compose([transforms.CenterCrop((224, 224)),
                                      transforms.RandomVerticalFlip(),
                                      transforms.RandomHorizontalFlip(),
-                                      transforms.ToTensor(),
+                                     transforms.ToTensor(),
                                      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     validation_transforms = transforms.Compose([transforms.CenterCrop((224, 224)),
@@ -142,69 +213,132 @@ def main():
     print(len(trainloader.dataset))
     print(len(trainloader)) 
 
-    # Retrieve pet labels from the current working directory currently no arguments are setup        
-    cat_to_name = get_label_mapping(in_arg.dir)
-    print(cat_to_name)
-
-    print("Learning rate:", in_arg.learning_rate)
-    print("Epochs:", in_arg.epochs)
-    if in_arg.arch:
-        print("CNN Model Architecture:{}", in_arg.arch)            
-    if in_arg.hidden_units:
-        print("Hidden Units: {}", in_arg.hidden_units)  
-    if in_arg.gpu is True:
-        device = torch.device("cuda:0")
-    
-    print("Device", device)
-    print("Pew pew")
-    
-    # Function that checks Pet Images in the results Dictionary using results    
-    #check_creating_pet_image_labels(results)
-
-    #TODO2: Load the data for transformation 
-    
-    # TODO 3: Define classify_images function within the file classiy_images.py
-    # Once the classify_images function has been defined replace first 'None' 
-    # in the function call with in_arg.dir and replace the last 'None' in the
-    # function call with in_arg.arch  Once you have done the replacements your
-    # function call should look like this: 
-    #             classify_images(in_arg.dir, results, in_arg.arch)
-    # Creates Classifier Labels with classifier function, Compares Labels, 
-    # and adds these results to the results dictionary - results
-    classify_images(in_arg.dir, results, in_arg.arch)
-
-    # Function that checks Results Dictionary using results    
-    check_classifying_images(results)    
-
-    
-    # TODO 4: Define adjust_results4_isadog function within the file adjust_results4_isadog.py
-    # Once the adjust_results4_isadog function has been defined replace 'None' 
-    # in the function call with in_arg.dogfile  Once you have done the 
-    # replacements your function call should look like this: 
-    #          adjust_results4_isadog(results, in_arg.dogfile)
-    # Adjusts the results dictionary to determine if classifier correctly 
-    # classified images as 'a dog' or 'not a dog'. This demonstrates if 
-    # model can correctly classify dog images as dogs (regardless of breed)
-    adjust_results4_isadog(results, None)
    
-    # Function that checks Results Dictionary for is-a-dog adjustment using results
-    check_classifying_labels_as_dogs(results)
-    
+    """
+    Define Network parameters 
 
-    # TODO 5: Define calculates_results_stats function within the file calculates_results_stats.py
-    # This function creates the results statistics dictionary that contains a
-    # summary of the results statistics (this includes counts & percentages). This
-    # dictionary is returned from the function call as the variable results_stats    
-    # Calculates results of run and puts statistics in the Results Statistics
-    # Dictionary - called results_stats
-    results_stats = calculates_results_stats(results)
+    """
+    # Network train cho cho
 
-    # Function that checks Results Statistics Dictionary using results_stats
-    check_calculating_results(results, results_stats)
+    criterion = nn.NLLLoss()
+
+    optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
+
+    model.to(device)
+
+    """
+    Define model 
+    """
+    steps = 0
+
+    train_Ls, valid_Ls = [], []
+
+    for epoch in range(epochs):
+        running_loss = 0
+        for input, labels in trainloader:
+            steps +=1
+
+            input, labels = input.to(device), labels.to(device)
+
+            logps = model.forward(input)
+            loss = criterion(logps, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+        else:
+            validation_loss = 0
+            accuracy = 0
+
+            model.eval()
+
+            with torch.no_grad():
+
+                for input, labels in validationloader:
+
+                    input, labels = input.to(device), labels.to(device)
+                    #Forward pass, get our log-probabilities
+                    logps = model.forward(input)
+                    batch_loss = criterion(logps, labels)
+                    validation_loss += batch_loss.item()
+
+                    ps = torch.exp(logps)
+                    top_p, top_class = ps.topk(1, dim=1) # remember ps.topk returns the k highest values in the form of two tuples top_p is the probability values, top_class class indeces
+                    equals = top_class == labels.view(*top_class.shape)
+                    accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+
+            #calculating epoch's average training loss
+            train_loss = running_loss / len(train_datasets)
+            valid_loss = validation_loss / len(validationloader.dataset)
 
 
-    print_results(results, results_stats, in_arg.arch, True, True)
-    
+            #calculating average loss for each batch
+            avg_Tbatch_loss = running_loss / steps
+            avg_Vbatch_loss = validation_loss / steps
+
+            epoch_loss = running_loss / len(trainloader.dataset)
+
+            #Collect all test and training loss to enable graphing the data
+            #this is saving each output from the training and validation loss
+            train_Ls.append(epoch_loss)
+            valid_Ls.append(valid_loss)
+
+            #Print function is out putting training, valiation loss per epoch
+            print(f"Epoch {epoch+1}/{epochs}.. "
+                    f"Training loss: {train_loss:.3f}.. "
+                    f"Validation loss: {valid_loss:.3f}.. "
+                    f"Validation accuracy: {accuracy/len(validationloader):.3f}")
+            running_loss = 0
+            model.train()
+
+
+    """
+    Model Testing
+    """
+    # TODO: Do validation on the test set
+    model.eval()
+    #Note: make sure to initialize accuracy and test_loss to 0 other wise it will inherit values from the previous cell
+    accuracy = 0
+    test_loss = 0
+
+    with torch.no_grad():
+
+            for input, labels in testloader:
+
+                    input, labels = input.to(device), labels.to(device)
+
+                    logps = model.forward(input)
+                    batch_loss = criterion(logps, labels)
+                    test_loss += batch_loss.item()
+
+                    ps = torch.exp(logps)
+                    top_p, top_class = ps.topk(1, dim=1) # remember ps.topk returns the k highest values in the form of two tuples top_p is the probability values, top_class class indeces
+                    print(top_p)
+                    equals = top_class == labels.view(*top_class.shape)
+                    accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+
+    print(f"Test loss: {test_loss/len(testloader):.3f}.. "
+                    f"Test accuracy : {accuracy/len(testloader):.3f}")
+
+    """
+    Save Model Checkpoint
+    """
+    print(train_datasets.class_to_idx)
+
+    model.class_to_idx = train_datasets.class_to_idx
+
+    checkpoint = {'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'epoch': epochs,
+                'class_to_idx':model.class_to_idx}
+
+    torch.save(checkpoint, 'checkpoint.pth')
+
+    print(checkpoint['class_to_idx'])
+    #model.train()    
   
     end_time = time()
     
