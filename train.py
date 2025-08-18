@@ -48,11 +48,11 @@ def get_input_args():
     # or we can just assume that the directoy retrieved in os.getcwd has the train and test folders as well as the cat_to_name.json file
     #parser.add_argument('--dir', nargs = '?', default = os.getcwd() , help='Image Folder as --dir with default value "pet_images"')
     parser.add_argument('dir', nargs = '?', default = os.getcwd()+'/', help='Image Dataset Folder otherwise default is current working directory')        
-    parser.add_argument('--save_dir', default=os.getcwd())
+    parser.add_argument('--save_dir', default='checkpoint.pth')
     parser.add_argument('--arch', default= "vgg")
     parser.add_argument('--learning_rate', type=float, default= 0.02)
     parser.add_argument('--hidden_units', type=int, default=512)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--gpu', action='store_true')
     # Replace None with parser.parse_args() parsed argument collection that 
     # you created with this function 
@@ -108,13 +108,16 @@ def load_transform():
 
 def main():
     #Please make sure to change this to CPU when you complete this project
-    device = "cuda:0"
+    #device = "cuda:0"
     device = "mps"
     
     start_time = time()    
     
     in_arg = get_input_args()
 
+    hidden_units = in_arg.hidden_units
+    output_units = max(int(0.2 * hidden_units), 102)
+    print("Output Units:", output_units)
     # TODO 1: we need to define a function that checks the input argument to ensure the directory path is in the correct format,
     # and possibly you can expand to the directory path exists as well as the folder structure should have data>train>class, data>validation>class
     #check_command_line_arguments(in_arg)     
@@ -141,10 +144,9 @@ def main():
             super().__init__()
 
             # part-2 Neural Networks,  fully-connected or dense networks. Each unit in one layer is connected to each unit in the next layer. In fully-connected networks, the input to each layer must be a one-dimensional vector (which can be stacked into a 2D tensor as a batch of multiple examples)
-            self.fc1 = nn.Linear(25088, 4096)
-            self.fc2 = nn.Linear(4096, 2048)
-            self.fc3 = nn.Linear(2048, 1000)
-            self.fc4 = nn.Linear(1000, 102)
+            self.fc1 = nn.Linear(25088, hidden_units)            
+            self.fc2 = nn.Linear(hidden_units, output_units)
+            self.fc3 = nn.Linear(output_units, 102)
             self.dropout = nn.Dropout(0.2)
 
         def forward(self, x):
@@ -153,9 +155,8 @@ def main():
 
             x = self.dropout(F.relu(self.fc1(x)))
             x = self.dropout(F.relu(self.fc2(x)))
-            x = self.dropout(F.relu(self.fc3(x)))
 
-            x = F.log_softmax(self.fc4(x), dim=1)
+            x = F.log_softmax(self.fc3(x), dim=1)
 
             return x
 
@@ -174,7 +175,7 @@ def main():
     epochs = in_arg.epochs
     print("Epochs:", in_arg.epochs)  
 
-    print("Hidden Units: {}", in_arg.hidden_units)  
+   
     if in_arg.gpu is True:
         device = torch.device("cuda:0")
         print("Device", device)
@@ -330,12 +331,14 @@ def main():
 
     model.class_to_idx = train_datasets.class_to_idx
 
-    checkpoint = {'model_state_dict': model.state_dict(),
+    checkpoint = { 
+                'hidden_units': hidden_units,
+                'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'epoch': epochs,
                 'class_to_idx':model.class_to_idx}
 
-    torch.save(checkpoint, 'checkpoint.pth')
+    torch.save(checkpoint, in_arg.save_dir)
 
     print(checkpoint['class_to_idx'])
     #model.train()    

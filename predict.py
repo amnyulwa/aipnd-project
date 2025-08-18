@@ -21,34 +21,38 @@ from torchvision import datasets, transforms, models, utils
 
 def load_checkpoint(filepath):
 
-    model = models.vgg16(pretrained=True)
+    checkpoint = torch.load(filepath, weights_only=False)
 
+    hidden_units = checkpoint['hidden_units']
+    output_units = max(int(0.2 * hidden_units), 102)
+    print("Output Units:", output_units)
+
+    model = models.vgg16(pretrained=True)
+    
     class Classifier(nn.Module):
       def __init__(self):
         super().__init__()
 
-        self.fc1 = nn.Linear(25088, 4096)
-        self.fc2 = nn.Linear(4096, 2048)
-        self.fc3 = nn.Linear(2048, 1000)
-        self.fc4 = nn.Linear(1000, 102)
+        self.fc1 = nn.Linear(25088, hidden_units)
+        self.fc2 = nn.Linear(hidden_units, output_units)       
+        self.fc3 = nn.Linear(output_units, 102)
         self.dropout = nn.Dropout(0.2)
 
       def forward(self, x):
         #print('Shape before {x.shape}')
         x = x.view(x.shape[0], -1)
 
-        x = self.dropout(F.relu(self.fc1(x)))
+        x = self.dropout(F.relu(self.fc1(x)))       
         x = self.dropout(F.relu(self.fc2(x)))
-        x = self.dropout(F.relu(self.fc3(x)))
 
-        x = F.log_softmax(self.fc4(x), dim=1)
+        x = F.log_softmax(self.fc3(x), dim=1)
 
         return x
 
 
     model.classifier = Classifier()
 
-    checkpoint = torch.load(filepath, weights_only=False)
+    
     model.load_state_dict(checkpoint['model_state_dict'])
 
     model.class_to_idx = checkpoint['class_to_idx']
