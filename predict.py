@@ -180,9 +180,13 @@ def predict(image_path, model, topk=5):
     #commenting out as model is already set to eval using the load_checkpoint() function
     #model.eval()
 
-    #sets default accelerator
-    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+    device = "cpu" 
 
+    if in_arg.gpu is True:
+        #sets default accelerator
+        device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+
+    print("Device:", device)
     model.to(device)
     with torch.no_grad():
       input = input.to(device)
@@ -227,7 +231,7 @@ def get_input_args():
     #parser.add_argument('--dir', nargs = '?', default = os.getcwd() , help='Image Folder as --dir with default value "pet_images"')
     parser.add_argument('dir', nargs = '*', default = [os.getcwd()+'/IMG_20250703_065528 (1) copy.jpg', os.getcwd()+'/checkpoint.pth'], help='Path to Image Dataset Folder otherwise default is current working directory') #for now i will set nargs to '* as i don't know if it's fixed we need to accept 3 arguments 2 positional and maybe one optional'
     #parser.add_argument('checkpoint', default= os.getcwd()+'/checkpoint.pth', help='path to checkpoint for training model') #this is experimental for now trying to see if i should have a positional argument or catch the nargs
-    parser.add_argument('--top_k', default= 5)
+    parser.add_argument('--top_k', type=int, default= 5)
     parser.add_argument('--category_names', default= os.getcwd()+"/cat_to_name.json")    
     parser.add_argument('--gpu', action='store_true')
     # Replace None with parser.parse_args() parsed argument collection that 
@@ -247,7 +251,7 @@ print("String:", paths)
 print('Num Args:', type(in_arg.dir))
 print('Args:', in_arg.dir[0])
 print('Args2:', in_arg.dir[1])
-print('Optional:', in_arg.top_k)
+print('Top_k:', type(in_arg.top_k))
 
 # TODO: Display an image along with the top 5 classes
 image_path = in_arg.dir[0]
@@ -257,7 +261,7 @@ checkpoint = in_arg.dir[1]
 
 model = load_checkpoint(checkpoint)
 
-top_p, top_class = predict(image_path, model)
+top_p, top_class = predict(image_path, model, in_arg.top_k)
 print("top_p: ", top_p)
 print("top_class", top_class)
 image = process_image(image_path)
@@ -273,7 +277,7 @@ probs = np.array(top_p).squeeze()
 classes = np.array(top_class).squeeze() #changed variable name to classes to avoid conflict
 ax2.barh(np.arange(in_arg.top_k), probs) # Display top 5
 ax2.set_aspect(0.1)
-ax2.set_yticks(np.arange(5))
+ax2.set_yticks(np.arange(in_arg.top_k))
 ax2.set_yticklabels([cat_to_name[str(c)] for c in classes], size='small') # changed variable name here as well
 #ax2.set_title('Class Probability')
 ax2.set_xlim(0, 1.1)

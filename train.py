@@ -118,6 +118,7 @@ def main():
     hidden_units = in_arg.hidden_units
     output_units = max(int(0.2 * hidden_units), 102)
     print("Output Units:", output_units)
+    
     # TODO 1: we need to define a function that checks the input argument to ensure the directory path is in the correct format,
     # and possibly you can expand to the directory path exists as well as the folder structure should have data>train>class, data>validation>class
     #check_command_line_arguments(in_arg)     
