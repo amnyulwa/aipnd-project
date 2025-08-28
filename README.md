@@ -32,3 +32,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torchvision import datasets, transforms, models, utils
+
+
+
+**Commands** 
+
+*Train Model*
+Train model commands can be run as it accepting default arguments make sure that the "data" file with training data is in the same file path as the train.py file. The command can be used like below without arguments 
+
+!python train.py 
+
+with arguments argumment that have the -- character are optional  --gpu option turns on model training using a GPU if your hardware supports it: 
+
+!python train.py /path/to/training/data/ --epochs 10 --learning_rate 0.001 --gpu 
+!python predict.py input checkpoint --category_names cat_to_name.json
