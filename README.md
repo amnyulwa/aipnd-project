@@ -14,3 +14,21 @@ Method 1
 Method 2
 
 !cp -r /data/ .
+
+
+Python Packages required 
+
+!pip install torch 
+!pip install torchvision 
+!pip install numpy
+!pip install matplotlib
+
+for use with the following imports
+
+from torch import nn
+from torch import optim
+from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
+from torchvision import datasets, transforms, models, utils
