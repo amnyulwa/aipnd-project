@@ -16,7 +16,7 @@ Method 2
 !cp -r /data/ .
 
 
-Python Packages required 
+**Python Packages required** 
 
 !pip install torch 
 !pip install torchvision 
