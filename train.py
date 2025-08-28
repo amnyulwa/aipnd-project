@@ -12,6 +12,11 @@
 # Thoughts
 # * We may need to figure out how to import list with class names the "cat_to_name.json" file
 
+
+#Changes:
+#Moving the model training back into the main function because I need to be able to save the model optimizer state we may need to improve this later
+
+#TODO 0: Import required Libraries
 import argparse
 import os
 import json
@@ -24,20 +29,17 @@ from torch import optim
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-import torch.nn.functional as F
+import torch.nn.functional as F # This import doesn't seem to be used 
 from torchvision import datasets, transforms, models, utils
 
-
-
-
-#so far this method only accepts 3 types of models and if there is a need i can work on expanding the list or automate the process to show more models
 resnet18 = models.resnet18(pretrained=True)
 alexnet = models.alexnet(pretrained=True)
 vgg16 = models.vgg16(pretrained=True)
 
-models = {'resnet': resnet18, 'alexnet': alexnet, 'vgg': vgg16}
 
 
+#def int_list(x):
+  #  return [x]
 
 def get_input_args():
   
@@ -50,8 +52,8 @@ def get_input_args():
     parser.add_argument('dir', nargs = '?', default = os.getcwd()+'/', help='Image Dataset Folder otherwise default is current working directory')        
     parser.add_argument('--save_dir', default='checkpoint.pth')
     parser.add_argument('--arch', default= "vgg")
-    parser.add_argument('--learning_rate', type=float, default= 0.02)
-    parser.add_argument('--hidden_units', type=int, default=512)
+    parser.add_argument('--learning_rate', type=float, default= 0.001)
+    parser.add_argument('--hidden_units', type=int , default=512)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--gpu', action='store_true')
     # Replace None with parser.parse_args() parsed argument collection that 
@@ -104,83 +106,78 @@ def load_transform():
     print(len(trainloader.dataset))
     print(len(trainloader))
 """
+class Classifier(nn.Module):
+    def __init__(self, hidden_units):
+        super().__init__()
+
+            
+        output_units = max(int(0.2 * hidden_units), 102)
+        print("Hidden units2:", hidden_units)
+        print("Output Units:", output_units)
+        # part-2 Neural Networks,  fully-connected or dense networks. Each unit in one layer is connected to each unit in the next layer. In fully-connected networks, the input to each layer must be a one-dimensional vector (which can be stacked into a 2D tensor as a batch of multiple examples)
+        self.fc1 = nn.Linear(25088, hidden_units)            
+        self.fc2 = nn.Linear(hidden_units, output_units)
+        self.fc3 = nn.Linear(output_units, 102)
+        self.dropout = nn.Dropout(0.2)
+
+    def forward(self, x):
+        #print('Shape before {x.shape}')
+        x = x.view(x.shape[0], -1)
+
+        x = self.dropout(F.relu(self.fc1(x)))        
+        x = self.dropout(F.relu(self.fc2(x)))
+
+        x = F.log_softmax(self.fc3(x), dim=1)
+
+        return x
+
+def model_test(testloader, model, device, criterion):
+        # TODO: Do validation on the test set
+    model.eval()
+    #Note: make sure to initialize accuracy and test_loss to 0 other wise it will inherit values from the previous cell
+    accuracy = 0
+    test_loss = 0
+
+    with torch.no_grad():
+
+            for input, labels in testloader:
+
+                    input, labels = input.to(device), labels.to(device)
+
+                    logps = model.forward(input)
+                    batch_loss = criterion(logps, labels)
+                    test_loss += batch_loss.item()
+
+                    ps = torch.exp(logps)
+                    top_p, top_class = ps.topk(1, dim=1) # remember ps.topk returns the k highest values in the form of two tuples top_p is the probability values, top_class class indeces
+                    print(top_p)
+                    equals = top_class == labels.view(*top_class.shape)
+                    accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+
+    print(f"Test loss: {test_loss/len(testloader):.3f}.. "
+                    f"Test accuracy : {accuracy/len(testloader):.3f}")
+
 
 
 def main():
+
+    start_time = time()  
+
+    #TODO 1: Command line arguments and variable mapping.
     #Please make sure to change this to CPU when you complete this project
     #device = "cuda:0"
-    device = "mps"
+    device = "mps"        
     
-    start_time = time()    
-    
-    in_arg = get_input_args()
+    in_arg = get_input_args()   
+    print("Hidden Argsss PPP:",type(in_arg.hidden_units))
 
-    hidden_units = in_arg.hidden_units
-    output_units = max(int(0.2 * hidden_units), 102)
-    print("Output Units:", output_units)
-    
-    # TODO 1: we need to define a function that checks the input argument to ensure the directory path is in the correct format,
-    # and possibly you can expand to the directory path exists as well as the folder structure should have data>train>class, data>validation>class
-    #check_command_line_arguments(in_arg)     
-      
-    print("Current Directory:{}, LR:{}, Epoch:{}".format(in_arg.dir, in_arg.learning_rate, in_arg.epochs))
-
-    # setup data directories 
+    # TODO 2: # setup data directories and Load data for Transforms
     # we may need to improve this such that the directory containing the data has a consistent name
     # We can update the folder name to be just data?
     data_dir = in_arg.dir     
     train_dir = data_dir + 'flowers' + '/train'
     valid_dir = data_dir + 'flowers' + '/valid'
     test_dir = data_dir + 'flowers' + '/test'
-    
-    #TODO 2: select model architecture 
-    model = models[in_arg.arch] #accepts input from user for model architecture     
-    print("model Arch:", model)
-
-    for param in model.parameters():
-        param.requires_grad = False 
-
-    class Classifier(nn.Module):
-        def __init__(self):
-            super().__init__()
-
-            # part-2 Neural Networks,  fully-connected or dense networks. Each unit in one layer is connected to each unit in the next layer. In fully-connected networks, the input to each layer must be a one-dimensional vector (which can be stacked into a 2D tensor as a batch of multiple examples)
-            self.fc1 = nn.Linear(25088, hidden_units)            
-            self.fc2 = nn.Linear(hidden_units, output_units)
-            self.fc3 = nn.Linear(output_units, 102)
-            self.dropout = nn.Dropout(0.2)
-
-        def forward(self, x):
-            #print('Shape before {x.shape}')
-            x = x.view(x.shape[0], -1)
-
-            x = self.dropout(F.relu(self.fc1(x)))
-            x = self.dropout(F.relu(self.fc2(x)))
-
-            x = F.log_softmax(self.fc3(x), dim=1)
-
-            return x
-
-    model.classifier = Classifier()
-
-    #TODO 3: define learning rate 
-    learning_rate = in_arg.learning_rate
-
-    #TODO 4: Actual labels
-    # Retrieve pet labels from the current working directory currently no arguments are setup        
-    cat_to_name = get_label_mapping(in_arg.dir)
-    print(cat_to_name)
-
-    #TODO 5: Model training Epoch argument
-    #It might be pointless to encapsulate in if arg since there is already a default argument defined
-    epochs = in_arg.epochs
-    print("Epochs:", in_arg.epochs)  
-
-   
-    if in_arg.gpu is True:
-        device = torch.device("cuda:0")
-        print("Device", device)
-   
 
     """
     Load Transforms
@@ -212,10 +209,44 @@ def main():
     validationloader = torch.utils.data.DataLoader(validation_datasets, batch_size=64)
     testloader = torch.utils.data.DataLoader(testing_datasets, batch_size=64)
 
-    print(len(trainloader.dataset))
-    print(len(trainloader)) 
+    #TODO 3: Label Mapping
+    # Retrieve pet labels from the current working directory currently no arguments are setup        
+    cat_to_name = get_label_mapping(data_dir)
+    print(cat_to_name)
+
+    
+    #TODO 4: Building and training the classifier 
+
+    #so far this method only accepts 3 types of models and if there is a need i can work on expanding the list or automate the process to show more models
+
+
+    models = {'resnet': resnet18, 'alexnet': alexnet, 'vgg': vgg16}
+
+    model = models[in_arg.arch] #accepts input from user for model architecture     
+    
+    print("Peew pew:", model)
+
+    for param in model.parameters():
+        param.requires_grad = False 
+
+    
+    #creating the model with input of 
+    model.classifier = Classifier(in_arg.hidden_units)
+   
+
+    #TODO 5: Model training Epoch argument
+    #It might be pointless to encapsulate in if arg since there is already a default argument defined
+    epochs = in_arg.epochs
+    print("Epochs:", in_arg.epochs)  
 
    
+    if in_arg.gpu is True:
+        device = torch.device("cuda:0")
+        print("Device", device)
+    
+   
+    print("The model again <<>>:", model)
+
     """
     Define Network parameters 
 
@@ -224,13 +255,10 @@ def main():
 
     criterion = nn.NLLLoss()
 
-    optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=in_arg.learning_rate) 
 
     model.to(device)
-
-    """
-    Define model 
-    """
+   
     steps = 0
 
     train_Ls, valid_Ls = [], []
@@ -294,37 +322,13 @@ def main():
                     f"Validation loss: {valid_loss:.3f}.. "
                     f"Validation accuracy: {accuracy/len(validationloader):.3f}")
             running_loss = 0
-            model.train()
+            model.train()# switching the model into train mode
 
 
     """
     Model Testing
-    """
-    # TODO: Do validation on the test set
-    model.eval()
-    #Note: make sure to initialize accuracy and test_loss to 0 other wise it will inherit values from the previous cell
-    accuracy = 0
-    test_loss = 0
-
-    with torch.no_grad():
-
-            for input, labels in testloader:
-
-                    input, labels = input.to(device), labels.to(device)
-
-                    logps = model.forward(input)
-                    batch_loss = criterion(logps, labels)
-                    test_loss += batch_loss.item()
-
-                    ps = torch.exp(logps)
-                    top_p, top_class = ps.topk(1, dim=1) # remember ps.topk returns the k highest values in the form of two tuples top_p is the probability values, top_class class indeces
-                    print(top_p)
-                    equals = top_class == labels.view(*top_class.shape)
-                    accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
-
-    print(f"Test loss: {test_loss/len(testloader):.3f}.. "
-                    f"Test accuracy : {accuracy/len(testloader):.3f}")
-
+    """ 
+    model_test(testloader, model, device, criterion)
     """
     Save Model Checkpoint
     """
@@ -332,17 +336,15 @@ def main():
 
     model.class_to_idx = train_datasets.class_to_idx
 
-    checkpoint = { 
-                'hidden_units': hidden_units,
+    checkpoint = {
+                'pre_trained_model': models[in_arg.arch],                
+                'hidden_units': in_arg.hidden_units,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'epoch': epochs,
                 'class_to_idx':model.class_to_idx}
 
-    torch.save(checkpoint, in_arg.save_dir)
-
-    print(checkpoint['class_to_idx'])
-    #model.train()    
+    torch.save(checkpoint, in_arg.save_dir)      
   
     end_time = time()
     

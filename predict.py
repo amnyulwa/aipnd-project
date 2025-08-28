@@ -14,44 +14,49 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torchvision import datasets, transforms, models, utils
 
+#Method converts input into list data type
+def int_list(x):
+    return [x]
 
 # TODO: Write a function that loads a checkpoint and rebuilds the model
 """Loading the Checkpoint"""
 """Note for imports this requires torchvision models module"""
-
-def load_checkpoint(filepath):
-
-    checkpoint = torch.load(filepath, weights_only=False)
-
-    hidden_units = checkpoint['hidden_units']
-    output_units = max(int(0.2 * hidden_units), 102)
-    print("Output Units:", output_units)
-
-    model = models.vgg16(pretrained=True)
-    
-    class Classifier(nn.Module):
-      def __init__(self):
+class Classifier(nn.Module):
+    def __init__(self, hidden_units):
         super().__init__()
 
-        self.fc1 = nn.Linear(25088, hidden_units)
-        self.fc2 = nn.Linear(hidden_units, output_units)       
+        
+        output_units = max(int(0.2 * hidden_units), 102)
+        print("Hidden units2:", hidden_units)
+        print("Output Units:", output_units)
+        # part-2 Neural Networks,  fully-connected or dense networks. Each unit in one layer is connected to each unit in the next layer. In fully-connected networks, the input to each layer must be a one-dimensional vector (which can be stacked into a 2D tensor as a batch of multiple examples)
+        self.fc1 = nn.Linear(25088, hidden_units)            
+        self.fc2 = nn.Linear(hidden_units, output_units)
         self.fc3 = nn.Linear(output_units, 102)
         self.dropout = nn.Dropout(0.2)
 
-      def forward(self, x):
+    def forward(self, x):
         #print('Shape before {x.shape}')
         x = x.view(x.shape[0], -1)
 
-        x = self.dropout(F.relu(self.fc1(x)))       
+        x = self.dropout(F.relu(self.fc1(x)))        
         x = self.dropout(F.relu(self.fc2(x)))
 
         x = F.log_softmax(self.fc3(x), dim=1)
 
         return x
+        
 
+def load_checkpoint(filepath):
 
-    model.classifier = Classifier()
-
+    checkpoint = torch.load(filepath, weights_only=False)
+    
+    hidden_layers = checkpoint['hidden_units']
+    print("TYpe HIdden kayers:",type(hidden_layers))
+    #model = models.
+    model = models.vgg16(pretrained=True)    
+    
+    model.classifier = Classifier(hidden_layers)
     
     model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -60,8 +65,8 @@ def load_checkpoint(filepath):
     #idx_to_class = {v: k for k, v in model.class_to_idx.items()}
 
     #Follow up: there is a requirement to save the optimizer state but there is no use for it follow up on this
-    optimizer = optim.Adam(model.classifier.parameters(), lr=0.002)
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    #optimizer = optim.Adam(model.classifier.parameters(), lr=0.002)
+    #optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     model.eval()
 
@@ -171,7 +176,7 @@ def predict(image_path, model, topk=5):
     ''' Predict the class (or classes) of an image using a trained deep learning model.
     '''
 
-    # TODO: Implement the code to predict the class from an image file
+    # TODO: Implement the code to predict the class from an image file    
     input = process_image(image_path)# takes in an image from file and then feeds into the process_image function to convert to NP array values
 
     #https://discuss.pytorch.org/t/expected-stride-to-be-a-single-integer-value-or-a-list/17612
@@ -229,13 +234,35 @@ def get_input_args():
     # TODO 0: Doing a default argument of os.getcwd() might not work because you need to define a default folder name which can be different
     # or we can just assume that the directoy retrieved in os.getcwd has the train and test folders as well as the cat_to_name.json file
     #parser.add_argument('--dir', nargs = '?', default = os.getcwd() , help='Image Folder as --dir with default value "pet_images"')
-    parser.add_argument('dir', nargs = '*', default = [os.getcwd()+'/IMG_20250703_065528 (1) copy.jpg', os.getcwd()+'/checkpoint.pth'], help='Path to Image Dataset Folder otherwise default is current working directory') #for now i will set nargs to '* as i don't know if it's fixed we need to accept 3 arguments 2 positional and maybe one optional'
-    #parser.add_argument('checkpoint', default= os.getcwd()+'/checkpoint.pth', help='path to checkpoint for training model') #this is experimental for now trying to see if i should have a positional argument or catch the nargs
-    parser.add_argument('--top_k', type=int, default= 5)
-    parser.add_argument('--category_names', default= os.getcwd()+"/cat_to_name.json")    
-    parser.add_argument('--gpu', action='store_true')
+    parser.add_argument(
+       'dir', 
+       nargs = '?', 
+       default = os.getcwd()+'/IMG_20250703_065528 (1) copy.jpg', 
+       help='Path to Image Dataset Folder otherwise default is current working directory'
+       ) #for now i will set nargs to '* as i don't know if it's fixed we need to accept 3 arguments 2 positional and maybe one optional'
+    parser.add_argument(
+       'checkpoint', 
+       nargs = "?", 
+       default= os.getcwd()+'/checkpoint.pth', 
+       help='path to checkpoint for training model'
+       ) #this is experimental for now trying to see if i should have a positional argument or catch the nargs
+    parser.add_argument(
+        '--top_k', 
+        type=int, 
+        default= 5,
+        help = 'Display the top number of results'
+        )
+    parser.add_argument(
+       '--category_names', 
+       default= os.getcwd()+"/cat_to_name.json"
+       )    
+    parser.add_argument(
+       '--gpu', 
+       action='store_true'
+       )
     # Replace None with parser.parse_args() parsed argument collection that 
     # you created with this function 
+    
     return parser.parse_args()
 
 #get commandline arguments
@@ -249,15 +276,15 @@ print(len(cat_to_name))
 paths = '"'+os.getcwd()+'/IMG_20250703_065528 (1) copy.jpg"' + ' "checkpoint.pth"'
 print("String:", paths)
 print('Num Args:', type(in_arg.dir))
-print('Args:', in_arg.dir[0])
-print('Args2:', in_arg.dir[1])
+#print('Args:', in_arg.dir[0])
+#print('Args2:', in_arg.dir[1])
 print('Top_k:', type(in_arg.top_k))
 
 # TODO: Display an image along with the top 5 classes
-image_path = in_arg.dir[0]
-
+image_path = in_arg.dir
+print("Image type:", type(image_path))
 #loading positional argument for model checkpoint
-checkpoint = in_arg.dir[1]
+checkpoint = in_arg.checkpoint
 
 model = load_checkpoint(checkpoint)
 
